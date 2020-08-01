@@ -27,12 +27,14 @@ readonly SRC_PYTHON3=  # <--  download newsest verstion instead
 # readonly SRC_GO=https://golang.org/dl/go1.14.6.linux-amd64.tar.gz
 readonly SRC_GO=  # <--  download newsest verstion instead
 
-readonly TMP_DIR=${PROG%.*}_build_dir
+readonly TMP_DIR=$PWD/${PROG%.*}_build_dir
 
 
-readonly INSTALL_PYTHON3=n
-readonly INSTALL_GO=n
-readonly INSTALL_RUST=n
+readonly INSTALL_PYTHON3=y
+readonly INSTALL_PYTHON3_MODULES=y
+
+readonly INSTALL_GO=y
+readonly INSTALL_RUST=y
 readonly INSTALL_ORG_VI=y
 
 
@@ -43,13 +45,9 @@ readonly INSTALL_ORG_VI=y
 msg() {
 /bin/cat >&2 << EOF
 
-
 ******************************************************************************
-
 $*
-
 ******************************************************************************
-
 
 EOF
 }
@@ -100,15 +98,24 @@ cd_to_extracted_dir_from_url() {
     cd "$src_dir"
 }
 
+strip_binaries_in() {
+    local dir="$1"
+
+    for binary in $(file $dir/* |\
+        awk '/not stripped/ {prog=$1; sub(/:/, "", prog); print prog}')
+    do
+        strip $binary
+    done
+}
+
+
 # ----------------------------------------------------------------------------
 # main
 # ----------------------------------------------------------------------------
 
 
 [ -d "$INST_DIR" ] || mkdir -p $INST_DIR
-[ -d "$TMP_DIR" ] || mkdir -p $TMP_DIR
-
-cd $TMP_DIR
+[ -d "$TMP_DIR" ]  || mkdir -p $TMP_DIR
 
 
 # ****************************************************************************
@@ -117,14 +124,22 @@ cd $TMP_DIR
 
 if [ "$INSTALL_PYTHON3" = "y" ]
 then
+	cd $TMP_DIR
+
     msg "donwload and extract Python3..."
+
+	pysite='https://www.python.org'
 
     if [ -n "$SRC_PYTHON3" ]
     then
         python_download_url="$SRC_PYTHON3"
     else
-        python3_latest=$(wget -qO- https://www.python.org/downloads/source/ |grep 'Latest Python 3 Release' | sed -e 's/.*Python *//' -e 's/<.*//')
-        python_download_url=https://www.python.org/ftp/python/${python3_latest}/Python-${python3_latest}.tar.xz
+        python3_latest=$(wget -qO- "${pysite}/downloads/source/" | \
+			grep 'Latest Python 3 Release' | \
+			sed -e 's/.*Python *//' -e 's/<.*//')
+
+        python_download_url="${pysite}/ftp/python/${python3_latest}/"
+		python_download_url+="Python-${python3_latest}.tar.xz"
     fi
 
     wget_if_not_there $python_download_url
@@ -134,34 +149,40 @@ then
     ./configure --prefix=$INST_DIR --enable-optimizations
 
     msg "make and install Python3..."
+
     make
     make install
-
-    cd ..
 
     # why not?
     msg "upgrade Python3 pip"
     pip3 install --upgrade pip
 
-    python_module_list=(
-        ansible
-        jedi
-        pudb
-        pyls                # Python language server
-        pytest
-        ranger-fm           # Terminal based file manager
-        youtube-dl
-    )
 
-    msg "Instll Python3 modules..."
+    if [ "$INSTALL_PYTHON3_MODULES" = "y" ]
+    then
+        msg "Install Python3 modules..."
 
-    for python_module in ${python_module_list[@]}
-    do
-        msg "  -> $python_module"
-        pip3 install $python_module
-    done
+        python_module_list=(
+            ansible
+            jedi                # needed for Vim/Nvim coc
+            pudb                # Turbo IDE like python debugger
+            pyls                # Python language server
+            pytest
+            ranger-fm           # Terminal based file manager
+            youtube-dl
+        )
+
+
+        for python_module in ${python_module_list[@]}
+        do
+            msg "  -> intall Python module $python_module..."
+            pip3 install $python_module
+        done
+    else
+        msg "Install *no* Python3 modules"
+    fi
 else
-    msg "skipped Python3"
+    msg "skipped Python3 installation"
 fi
 
 
@@ -184,7 +205,8 @@ then
     then
         go_download_url="$SRC_GO"
     else
-        go_download_url=$(wget -qO- https://golang.org/dl/ |grep linux-amd64 | head -1 |sed -e 's/.*href="//'  -e 's/".*//')
+        go_download_url=$(wget -qO- https://golang.org/dl/ | \
+			grep linux-amd64 | head -1 |sed -e 's/.*href="//'  -e 's/".*//')
         go_download_url="https://golang.org${go_download_url}"
     fi
 
@@ -195,7 +217,9 @@ then
 
     wget_if_not_there "$go_download_url"
     go_dir=$(extract_arch_from_url "$go_download_url")
-    [ -n "$go_dir" ] || abort "unable to extract go_dir from URL $go_download_url"
+
+    [ -n "$go_dir" ] || \
+		abort "unable to extract go_dir from URL $go_download_url"
 
     msg "Go distribution dir from downloaded archive is \"$go_dir\""
 
@@ -211,10 +235,7 @@ then
 
         /bin/ln -fs $go_name go
         msg "Created go symlink in $go_inst_dir"
-
-        cd ..
     fi
-
 
     export PATH=$INST_DIR/opt/go/bin:$PATH
 
@@ -233,6 +254,9 @@ then
         go install $go_program_url
     done
 
+    strip_binaries_in $INST_DIR/opt/go/bin
+    strip_binaries_in $INST_DIR/go/bin
+
 else
     msg "skipped Go"
 fi
@@ -249,8 +273,10 @@ then
 	then
 		$rustup_prog update
 	else
-    	curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
+    	curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs |sh -s -- -y
 	fi
+
+    strip_binaries_in $HOME/.cargo/bin
 
 else
     msg "skipped Rust"
@@ -262,6 +288,8 @@ if [ "$INSTALL_ORG_VI" = "y" ]
 then
     msg "Install traditional vi"
 
+	cd $TMP_DIR
+
     org_vi_url='https://github.com/n-t-roff/heirloom-ex-vi.git'
     git clone $org_vi_url org_vi
 
@@ -270,30 +298,41 @@ then
     ./configure
     make
 
+	test -d $INST_DIR/bin || /bin/mkdir -pv $_
+
     /bin/ln ex vi
     /bin/cp -v ex exrecover vi $INST_DIR/bin
 
     man_path_1=$INST_DIR/share/man/man1
 
-    [ -d $man_path_1 ] || mkdir -vp $man_path_1
+    test -d $man_path_1 || /bin/mkdir -vp $_
     /bin/cp -v vi.1 $man_path_1
-
-    cd ../..
 else
     msg "Skip installation of traditional vi"
 fi
 
 # ----------------------------------------------------------------------------
 
+
+strip_binaries_in $INST_DIR/bin
+
+home_def="${INST_DIR/$HOME/\$HOME}"
+
 msg "Add the following lines to your local profile:"
 
-/bin/cat << EOF
+echo ""
+echo "export LOCAL_ENV=$home_def"
 
+path_export_line='export PATH=$LOCAL_ENV/bin:$LOCAL_ENV/opt/go/bin'
 
-export PATH=$INST_DIR/bin:$INST_DIR/opt/go/bin:HOME
-export MANPATH=${MANPATH+$MANPATH:}$HOME/$INST_DIR/share/man
+[ "$INSTALL_RUST" = "y" ] && path_export_line+=':$LOCAL_ENV/.cargo/bin'
+path_export_line+=':$PATH'
 
-EOF
+echo $path_export_line
+
+echo 'export MANPATH=${MANPATH+$MANPATH:}$LOCAL_ENV/share/man'
+
+echo ""
 
 msg "Done!"
 exit 0
