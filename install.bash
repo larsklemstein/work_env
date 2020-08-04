@@ -37,6 +37,10 @@ readonly INSTALL_GO=y
 readonly INSTALL_RUST=y
 readonly INSTALL_ORG_VI=y
 
+readonly INSTALL_NVIM=y
+readonly NVIM_RELEASE=0.4
+
+
 
 # ----------------------------------------------------------------------------
 # functions
@@ -58,11 +62,11 @@ abort() {
 }
 
 wget_if_not_there() {
-	local url="$1"
+    local url="$1"
 
-	local file="${url##*/}"
+    local file="${url##*/}"
 
-	test -s "$file" || wget $url
+    test -s "$file" || wget $url
 }
 
 extract_arch_from_url() {
@@ -124,22 +128,22 @@ strip_binaries_in() {
 
 if [ "$INSTALL_PYTHON3" = "y" ]
 then
-	cd $TMP_DIR
+    cd $TMP_DIR
 
     msg "donwload and extract Python3..."
 
-	pysite='https://www.python.org'
+    pysite='https://www.python.org'
 
     if [ -n "$SRC_PYTHON3" ]
     then
         python_download_url="$SRC_PYTHON3"
     else
         python3_latest=$(wget -qO- "${pysite}/downloads/source/" | \
-			grep 'Latest Python 3 Release' | \
-			sed -e 's/.*Python *//' -e 's/<.*//')
+            grep 'Latest Python 3 Release' | \
+            sed -e 's/.*Python *//' -e 's/<.*//')
 
         python_download_url="${pysite}/ftp/python/${python3_latest}/"
-		python_download_url+="Python-${python3_latest}.tar.xz"
+        python_download_url+="Python-${python3_latest}.tar.xz"
     fi
 
     wget_if_not_there $python_download_url
@@ -206,7 +210,7 @@ then
         go_download_url="$SRC_GO"
     else
         go_download_url=$(wget -qO- https://golang.org/dl/ | \
-			grep linux-amd64 | head -1 |sed -e 's/.*href="//'  -e 's/".*//')
+            grep linux-amd64 | head -1 |sed -e 's/.*href="//'  -e 's/".*//')
         go_download_url="https://golang.org${go_download_url}"
     fi
 
@@ -219,7 +223,7 @@ then
     go_dir=$(extract_arch_from_url "$go_download_url")
 
     [ -n "$go_dir" ] || \
-		abort "unable to extract go_dir from URL $go_download_url"
+        abort "unable to extract go_dir from URL $go_download_url"
 
     msg "Go distribution dir from downloaded archive is \"$go_dir\""
 
@@ -242,6 +246,7 @@ then
     msg "Installing Go based programs..."
 
     go_program_url_list=(
+	"github.com/wallix/awless"
         "github.com/junegunn/fzf"
     )
 
@@ -267,14 +272,14 @@ if [ "$INSTALL_RUST" = "y" ]
 then
     msg "Installing/Updating Rust..."
 
-	rustup_prog="$HOME/.cargo/bin/rustup"
+    rustup_prog="$HOME/.cargo/bin/rustup"
 
-	if [ -f "$rustup_prog" ]
-	then
-		$rustup_prog update
-	else
-    	curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs |sh -s -- -y
-	fi
+    if [ -f "$rustup_prog" ]
+    then
+        $rustup_prog update
+    else
+        curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs |sh -s -- -y
+    fi
 
     strip_binaries_in $HOME/.cargo/bin
 
@@ -288,7 +293,7 @@ if [ "$INSTALL_ORG_VI" = "y" ]
 then
     msg "Install traditional vi"
 
-	cd $TMP_DIR
+    cd $TMP_DIR
 
     org_vi_url='https://github.com/n-t-roff/heirloom-ex-vi.git'
     git clone $org_vi_url org_vi
@@ -298,20 +303,57 @@ then
     ./configure
     make
 
-	test -d $INST_DIR/bin || /bin/mkdir -pv $_
+    test -d $INST_DIR/bin || /bin/mkdir -pv $_
 
     /bin/ln ex vi
-    /bin/cp -v ex exrecover vi $INST_DIR/bin
+    /bin/cp -v ex exrecover vi wvi $INST_DIR/bin
 
     man_path_1=$INST_DIR/share/man/man1
 
     test -d $man_path_1 || /bin/mkdir -vp $_
-    /bin/cp -v vi.1 $man_path_1
+    /bin/cp -v *.1 $man_path_1
 else
     msg "Skip installation of traditional vi"
 fi
 
 # ----------------------------------------------------------------------------
+
+
+if [ "$INSTALL_NVIM" = "y" ]
+then
+    msg "Install Neovim..."
+
+    cd $TMP_DIR
+
+    nvim_git_url=https://github.com/neovim/neovim.git
+
+    git clone $nvim_git_url --branch release-${NVIM_RELEASE:-0.4} \
+        --single-branch nvim
+
+    cd nvim
+
+    make CMAKE_INSTALL_PREFIX=$INST_DIR CMAKE_BUILD_TYPE=RelWithDebInfo
+
+    test -f $HOME/.config/nvim/autoload/plug.vim && /bin/rm -vf $_
+    test -d $HOME/.local/share/nvim && /bin/rm -rf $_
+
+    make install
+
+    if [ "$INSTALL_PYTHON3" = "y" ]
+    then
+        python_modules_needed_for_nvim=(
+            pynvim
+            neovim
+        )
+    
+        for python_module in ${python_modules_needed_for_nvim[$@]}
+        do
+                pip3 install $python_module
+        done
+    fi
+else
+    msg "Skip installation of Neovim..."
+fi
 
 
 strip_binaries_in $INST_DIR/bin
