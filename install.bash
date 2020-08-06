@@ -157,6 +157,18 @@ then
     make
     make install
 
+	msg "check if installation is complete (by testing some standard modules)"
+
+	python_modules_to_check=(
+		ssl
+		bz2
+	)
+
+	for python_module_to_check in ${python_modules_to_check[@]}
+	do
+		python3 -m $python_module_to_check
+	done
+
     # why not?
     msg "upgrade Python3 pip"
     pip3 install --upgrade pip
@@ -170,6 +182,7 @@ then
             ansible
             jedi                # needed for Vim/Nvim coc
             pudb                # Turbo IDE like python debugger
+	    pylint
             pyls                # Python language server
             pytest
             ranger-fm           # Terminal based file manager
