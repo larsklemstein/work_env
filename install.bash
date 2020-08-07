@@ -378,7 +378,18 @@ msg "Add the following lines to your local profile:"
 echo ""
 echo "export LOCAL_ENV=$home_def"
 
-path_export_line='export PATH=$LOCAL_ENV/bin:$LOCAL_ENV/opt/go/bin'
+local_env_path_list=(
+	$LOCAL_ENV/bin
+	$LOCAL_ENV/opt/go/bin
+	$LOCAL_ENV/opt/node/bin
+	$LOCAL_ENV/go/bin
+)
+
+path_export_line=
+for local_env_path in ${local_env_path_list[$@]}
+do
+    path_export_line+=${path_export_line+$path_export_line:}$local_env_path
+done
 
 [ "$INSTALL_RUST" = "y" ] && path_export_line+=':$LOCAL_ENV/.cargo/bin'
 path_export_line+=':$PATH'
