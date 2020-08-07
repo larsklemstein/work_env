@@ -35,7 +35,6 @@ readonly INSTALL_PYTHON3_MODULES=y
 
 readonly INSTALL_GO=y
 readonly INSTALL_RUST=y
-readonly INSTALL_ORG_VI=y
 
 readonly INSTALL_NVIM=y
 readonly NVIM_RELEASE=0.4
@@ -301,36 +300,6 @@ else
 fi
 
 # ----------------------------------------------------------------------------
-
-if [ "$INSTALL_ORG_VI" = "y" ]
-then
-    msg "Install traditional vi"
-
-    cd $TMP_DIR
-
-    org_vi_url='https://github.com/n-t-roff/heirloom-ex-vi.git'
-    git clone $org_vi_url org_vi
-
-    cd org_vi
-
-    ./configure
-    make
-
-    test -d $INST_DIR/bin || /bin/mkdir -pv $_
-
-    /bin/ln ex vi
-    /bin/cp -v ex exrecover vi wvi $INST_DIR/bin
-
-    man_path_1=$INST_DIR/share/man/man1
-
-    test -d $man_path_1 || /bin/mkdir -vp $_
-    /bin/cp -v *.1 $man_path_1
-else
-    msg "Skip installation of traditional vi"
-fi
-
-# ----------------------------------------------------------------------------
-
 
 if [ "$INSTALL_NVIM" = "y" ]
 then
