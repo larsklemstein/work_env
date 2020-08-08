@@ -27,14 +27,21 @@ readonly SRC_PYTHON3=  # <--  download newsest verstion instead
 # readonly SRC_GO=https://golang.org/dl/go1.14.6.linux-amd64.tar.gz
 readonly SRC_GO=  # <--  download newsest verstion instead
 
-readonly TMP_DIR=$PWD/${PROG%.*}_build_dir
+# readonly SRC_NODE=https://nodejs.org/dist/v12.18.3/node-v12.18.3-linux-x64.tar.xz
+readonly SRC_NODE=
+
+readonly BUILD_DIR="$PWD/${PROG%.*}_build_dir"
+readonly DOWNLOAD_DIR="$BUILD_DIR/download"
 
 
-readonly INSTALL_PYTHON3=y
-readonly INSTALL_PYTHON3_MODULES=y
+readonly INSTALL_PYTHON3=n
+readonly INSTALL_PYTHON3_MODULES=n
 
-readonly INSTALL_GO=y
-readonly INSTALL_RUST=y
+readonly INSTALL_GO=n
+
+readonly INSTALL_NODE=n
+
+readonly INSTALL_RUST=n
 
 readonly INSTALL_NVIM=y
 readonly NVIM_RELEASE=0.4
@@ -63,29 +70,29 @@ abort() {
 wget_if_not_there() {
     local url="$1"
 
-    local file="${url##*/}"
+    local file="$DOWNLOAD_DIR/${url##*/}"
 
-    test -s "$file" || wget $url
+    test -s "$file" || wget $url -O "$file"
 }
 
 extract_arch_from_url() {
     local url="$1"
 
-    local archive="${url##*/}"
+    local archive="$DOWNLOAD_DIR/${url##*/}"
     local src_dir=""
 
     case $archive in
         *.tar.xz)
             src_dir=$(tar tJf $archive |head -1 |tr -d '/')
-            tar xJf $archive
+            tar xJf $archive -C "$DOWNLOAD_DIR"
             ;;
         *.tar.gz|*.tgz)
             src_dir=$(tar tzf $archive |head -1 |tr -d '/')
-            tar xzf $archive
+            tar xzf $archive -C "$DOWNLOAD_DIR"
             ;;
     esac
 
-    echo "$src_dir"
+    echo "$DOWNLOAD_DIR/$src_dir"
 }
 
 cd_to_extracted_dir_from_url() {
@@ -111,14 +118,14 @@ strip_binaries_in() {
     done
 }
 
-
 # ----------------------------------------------------------------------------
 # main
 # ----------------------------------------------------------------------------
 
 
-[ -d "$INST_DIR" ] || mkdir -p $INST_DIR
-[ -d "$TMP_DIR" ]  || mkdir -p $TMP_DIR
+[ -d "$INST_DIR" ]      || mkdir -p "$INST_DIR"
+[ -d "$BUILD_DIR" ]     || mkdir -p "$BUILD_DIR"
+[ -d "$DOWNLOAD_DIR" ]  || mkdir -p "$DOWNLOAD_DIR"
 
 
 # ****************************************************************************
@@ -127,7 +134,7 @@ strip_binaries_in() {
 
 if [ "$INSTALL_PYTHON3" = "y" ]
 then
-    cd $TMP_DIR
+    cd $BUILD_DIR
 
     msg "donwload and extract Python3..."
 
@@ -156,17 +163,17 @@ then
     make
     make install
 
-	msg "check if installation is complete (by testing some standard modules)"
+    msg "check if installation is complete"
 
-	python_modules_to_check=(
-		ssl
-		bz2
-	)
+    python_modules_to_check=(
+        ssl
+        bz2
+    )
 
-	for python_module_to_check in ${python_modules_to_check[@]}
-	do
-		python3 -m $python_module_to_check
-	done
+    for python_module_to_check in ${python_modules_to_check[@]}
+    do
+        python3 -m $python_module_to_check
+    done
 
     # why not?
     msg "upgrade Python3 pip"
@@ -181,13 +188,12 @@ then
             ansible
             jedi                # needed for Vim/Nvim coc
             pudb                # Turbo IDE like python debugger
-	    pylint
+            pylint
             pyls                # Python language server
             pytest
             ranger-fm           # Terminal based file manager
             youtube-dl
         )
-
 
         for python_module in ${python_module_list[@]}
         do
@@ -258,14 +264,14 @@ then
     msg "Installing Go based programs..."
 
     go_program_url_list=(
-	"github.com/wallix/awless"
+    "github.com/wallix/awless"
         "github.com/junegunn/fzf"
     )
 
     for go_program_url in "${go_program_url_list[$@]}"
     do
         go_program_name="${go_program_url##*/}"
-        msg "  -> $go_program_name (from $go_program_url)"
+        msg "  -> $go_program_name from $go_program_url"
 
         go get     $go_program_url
         go install $go_program_url
@@ -278,11 +284,52 @@ else
     msg "skipped Go"
 fi
 
+
+# ----------------------------------------------------------------------------
+# Node LTS (needed for Nvim-Coc LSP)
+# ----------------------------------------------------------------------------
+
+if  [ "$INSTALL_NODE" = "y" ]
+then
+    msg "Installing Node..."
+
+    node_site="https://nodejs.org/en/download"
+
+    if [ -n "$SRC_NODE" ]
+    then
+        node_download_url=$SRC_NODE
+    else
+        node_download_url=$(wget -qO- "${node_site}" \
+		| sed -ne 's!.*href="\(https://.*-linux-x64\.tar\.xz\).*!\1!p' \
+		| head -1)
+	fi
+
+    msg "Node download URL is $node_download_url; download and extract..."
+
+    wget_if_not_there $node_download_url
+    node_dir=$(extract_arch_from_url "$node_download_url")
+
+	echo "node dir: $node_dir"
+
+	node_inst_dir=$INST_DIR/opt
+	[ -d "$node_inst_dir" ] || mkdir -p $node_inst_dir
+
+	/bin/mv -v $node_dir $node_inst_dir
+	cd $node_inst_dir
+
+	/bin/ln -sf ${node_dir##*/} node
+else
+    msg "skipped Node"
+fi
+
+
+# ----------------------------------------------------------------------------
+# Rust
 # ----------------------------------------------------------------------------
 
 if [ "$INSTALL_RUST" = "y" ]
 then
-    msg "Installing/Updating Rust..."
+    msg "Installing Rust..."
 
     rustup_prog="$HOME/.cargo/bin/rustup"
 
@@ -299,13 +346,16 @@ else
     msg "skipped Rust"
 fi
 
+
+# ----------------------------------------------------------------------------
+# Neovim
 # ----------------------------------------------------------------------------
 
 if [ "$INSTALL_NVIM" = "y" ]
 then
     msg "Install Neovim..."
 
-    cd $TMP_DIR
+    cd $BUILD_DIR
 
     nvim_git_url=https://github.com/neovim/neovim.git
 
@@ -314,7 +364,43 @@ then
 
     cd nvim
 
-    make CMAKE_INSTALL_PREFIX=$INST_DIR CMAKE_BUILD_TYPE=RelWithDebInfo
+	make_out=nvim_make.out
+
+	declare -a failed_pair_list
+
+	while :
+	do
+		make CMAKE_INSTALL_PREFIX=$INST_DIR CMAKE_BUILD_TYPE=RelWithDebInfo 2>&1 \
+			| tee $make_out
+
+		# ugly hack for WSL (at least...)
+		#
+		failed_pair=$(tail -50 $make_out \
+			| perl -0777 -e 'my $f = <>; if ($f =~m{failed to rename\s+(\S+)\s+to\s+(\S+)\s+because: Permission denied}) { my ($f, $t) = ($1, $2);  print  "$f:$t\n";}')
+
+		if [ -z "$failed_pair" ]
+		then
+
+			# !!!
+			# TODO: check make file for other errors
+			# !!!
+
+			break
+		else
+			if [[ "${failed_pair_list[@]}" =~ "$failed_pair" ]]
+			then
+				abort "error pair prodcuces twice: $failed_par"		
+			else
+				echo "found error pair the first time, try 1x again... ($failed_pair)"	
+				failed_pair_list+=("$failed_pair")
+
+				failed_from=${failed_pair%:*}
+				failed_to=${failed_pair#*:}
+
+				/bin/mv -v "$failed_from" "$failed_to"
+			fi
+		fi
+	done
 
     test -f $HOME/.config/nvim/autoload/plug.vim && /bin/rm -vf $_
     test -d $HOME/.local/share/nvim && /bin/rm -rf $_
@@ -338,6 +424,10 @@ else
 fi
 
 
+# ----------------------------------------------------------------------------
+# Generate environment hints
+# ----------------------------------------------------------------------------
+
 strip_binaries_in $INST_DIR/bin
 
 home_def="${INST_DIR/$HOME/\$HOME}"
@@ -348,10 +438,10 @@ echo ""
 echo "export LOCAL_ENV=$home_def"
 
 local_env_path_list=(
-	$LOCAL_ENV/bin
-	$LOCAL_ENV/opt/go/bin
-	$LOCAL_ENV/opt/node/bin
-	$LOCAL_ENV/go/bin
+    '$LOCAL_ENV/bin'
+    '$LOCAL_ENV/opt/go/bin'
+    '$LOCAL_ENV/opt/node/bin'
+    '$LOCAL_ENV/go/bin'
 )
 
 path_export_line=
@@ -371,3 +461,8 @@ echo ""
 
 msg "Done!"
 exit 0
+
+
+# ----------------------------------------------------------------------------
+# Done?
+# ----------------------------------------------------------------------------
