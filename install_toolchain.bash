@@ -34,12 +34,12 @@ readonly BUILD_DIR="$PWD/${PROG%.*}_build_dir"
 readonly DOWNLOAD_DIR="$BUILD_DIR/download"
 
 
-readonly INSTALL_PYTHON3=n
-readonly INSTALL_PYTHON3_MODULES=n
+readonly INSTALL_PYTHON3=y
+readonly INSTALL_PYTHON3_MODULES=y
 
-readonly INSTALL_GO=n
+readonly INSTALL_GO=y
 
-readonly INSTALL_NODE=n
+readonly INSTALL_NODE=y
 
 readonly INSTALL_RUST=n
 
@@ -192,6 +192,7 @@ then
             pyls                # Python language server
             pytest
             ranger-fm           # Terminal based file manager
+            virtualenv
             youtube-dl
         )
 
