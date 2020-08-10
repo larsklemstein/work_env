@@ -384,34 +384,6 @@ then
 	do
 		make CMAKE_INSTALL_PREFIX=$INST_DIR CMAKE_BUILD_TYPE=RelWithDebInfo 2>&1 \
 			| tee $make_out
-
-		# ugly hack for WSL (at least...)
-		#
-		failed_pair=$(tail -50 $make_out \
-			| perl -0777 -e 'my $f = <>; if ($f =~m{failed to rename\s+(\S+)\s+to\s+(\S+)\s+because: Permission denied}) { my ($f, $t) = ($1, $2);  print  "$f:$t\n";}')
-
-		if [ -z "$failed_pair" ]
-		then
-
-			# !!!
-			# TODO: check make file for other errors
-			# !!!
-
-			break
-		else
-			if [[ "${failed_pair_list[@]}" =~ "$failed_pair" ]]
-			then
-				abort "error pair prodcuces twice: $failed_par"		
-			else
-				echo "found error pair the first time, try 1x again... ($failed_pair)"	
-				failed_pair_list+=("$failed_pair")
-
-				failed_from=${failed_pair%:*}
-				failed_to=${failed_pair#*:}
-
-				/bin/mv -v "$failed_from" "$failed_to"
-			fi
-		fi
 	done
 
     test -f $HOME/.config/nvim/autoload/plug.vim && /bin/rm -vf $_
