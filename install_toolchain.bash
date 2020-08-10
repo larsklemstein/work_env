@@ -40,6 +40,7 @@ readonly INSTALL_PYTHON3_MODULES=y
 readonly INSTALL_GO=y
 
 readonly INSTALL_NODE=y
+readonly INSTALL_NODE_MODULES=y
 
 readonly INSTALL_RUST=n
 
@@ -310,8 +311,6 @@ then
     wget_if_not_there $node_download_url
     node_dir=$(extract_arch_from_url "$node_download_url")
 
-	echo "node dir: $node_dir"
-
 	node_inst_dir=$INST_DIR/opt
 	[ -d "$node_inst_dir" ] || mkdir -p $node_inst_dir
 
@@ -319,6 +318,18 @@ then
 	cd $node_inst_dir
 
 	/bin/ln -sf ${node_dir##*/} node
+
+    if [ "$INSTALL_NODE_MODULES" = y ]
+    then
+        node_modules_list=)
+            bats # bash testing framework
+        )
+
+        for node_module in ${node_modules_list[$@]}
+        do
+            $node_inst_dir/node/bin/npm install -g $node_module
+        done
+    fi
 else
     msg "skipped Node"
 fi
