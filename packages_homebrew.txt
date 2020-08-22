@@ -7,5 +7,4 @@ fzf
 ranger
 ansible
 awscli
-awless
-telnet
+youtube-dl
