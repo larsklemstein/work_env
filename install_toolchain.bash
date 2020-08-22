@@ -39,11 +39,15 @@ cd $TMPDIR
 
 main() {
 	check_requirements
+    initial_cleanup
+
 	# install_homebrew
 
 	# set_homebrew_environment
 	# install_homebrew_packages
-	install_python_packages
+	# install_python_packages
+
+	install_rust
 
 	msg_ok "Done!"
 	exit 0
@@ -77,6 +81,19 @@ check_requirements() {
 
 	test -f $PYTHON_PACKAGES || \
 		msg_abort "python packages file \"$PYTHON_PACKAGES\" not found"
+}
+
+initial_cleanup() {
+    local coc_path="$HOME/.config/coc"
+    local coc_path_saved="${coc_path}.saved"
+
+    if [ -d $coc_path ]
+    then
+        msg_warn "Detected existing $coc_path..."
+        msg_warn "Will save as $coc_path_saved"
+
+        /bin/mv -v $coc_path $coa_path_saved
+    fi
 }
 
 install_homebrew() {

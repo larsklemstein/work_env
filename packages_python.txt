@@ -3,3 +3,4 @@ jedi
 flake8
 pylint
 pytest
+youtube-dl

@@ -5,3 +5,7 @@ nvim
 go
 fzf
 ranger
+ansible
+awscli
+awless
+telnet
