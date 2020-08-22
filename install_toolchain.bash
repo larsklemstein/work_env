@@ -21,8 +21,8 @@ readonly HOMEBREW_INSTALLER_URL=${HOMEBREW_BASE_URL}/install/master/install.sh
 
 readonly EXPECT_SCRIPT=$(cd ${0%/*}; echo $PWD/homebrew_install.expect)
 
-readonly HOMEBREW_PACKAGES=$(cd ${0%/*}; echo $PWD/homebrew_packages.txt)
-readonly PYTHON_PACKAGES=$(cd ${0%/*}; echo $PWD/python_packages.txt)
+readonly HOMEBREW_PACKAGES=$(cd ${0%/*}; echo $PWD/packages_homebrew.txt)
+readonly PYTHON_PACKAGES=$(cd ${0%/*}; echo $PWD/packages_python.txt)
 
 readonly PROFILE_HOMEBREW=$HOME/.profile_homebrew
 readonly PROFILE_USER=$HOME/.profile_local
