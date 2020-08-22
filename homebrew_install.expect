@@ -1,0 +1,18 @@
+#!/usr/bin/expect
+
+set count [llength $argv]
+
+if { $count != 2} { 
+	puts "usage: $argv0 install_sh user_name";
+	exit 1
+}
+
+set install_sh [lindex $argv 0]
+set user_name  [lindex $argv 1]
+
+spawn $install_sh
+
+expect "password for $user_name:" { send "\x04" }
+expect "Press RETURN to continue or any other key to abort" { send "\r" }
+
+interact
