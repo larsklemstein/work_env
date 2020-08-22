@@ -16,10 +16,38 @@
 
 readonly PROG=${0##*/}
 
+readonly HOMEBREW_BASE_URL=https://raw.githubusercontent.com/Homebrew
+readonly HOMEBREW_INSTALLER_URL=${HOMEBREW_BASE_URL}/install/master/install.sh
+
+readonly EXPECT_SCRIPT=$(cd ${0%/*}; echo $PWD/homebrew_install.expect)
+
+readonly HOMEBREW_PACKAGES=$(cd ${0%/*}; echo $PWD/homebrew_packages.txt)
+readonly PYTHON_PACKAGES=$(cd ${0%/*}; echo $PWD/python_packages.txt)
+
+readonly PROFILE_HOMEBREW=$HOME/.profile_homebrew
+readonly PROFILE_USER=$HOME/.profile_local
+
+
+readonly TMPDIR=$(mktemp -d)
+trap 'cd - >/dev/null; /bin/rm -rf $TMPDIR' 0 1 2
+cd $TMPDIR
+
 
 # ----------------------------------------------------------------------------
 # functions
 # ----------------------------------------------------------------------------
+
+main() {
+	check_requirements
+	# install_homebrew
+
+	# set_homebrew_environment
+	# install_homebrew_packages
+	install_python_packages
+
+	msg_ok "Done!"
+	exit 0
+}
 
 msg_ok() {
 	echo -e "\e[92m[$PROG] $1\e[39m" >&2
@@ -38,11 +66,89 @@ msg_abort() {
 	exit 1
 }
 
+check_requirements() {
+	test -f $EXPECT_SCRIPT || \
+		msg_abort "expect script \"$EXPECT_SCRIPT\" not found"
+	test -x $EXPECT_SCRIPT || \
+		msg_abort "expect script \"$EXPECT_SCRIPT\" found, but not executable"
+
+	test -f $HOMEBREW_PACKAGES || \
+		msg_abort "homebrew packages file \"$HOMEBREW_PACKAGES\" not found"
+
+	test -f $PYTHON_PACKAGES || \
+		msg_abort "python packages file \"$PYTHON_PACKAGES\" not found"
+}
+
+install_homebrew() {
+	local installer_basename user_name marker
+
+	marker='[Homebrew install] '
+	msg_ok "${marker}now in $PWD"
+	msg_ok "${marker}download $HOMEBREW_INSTALLER_URL..."
+
+	installer_basename=${HOMEBREW_INSTALLER_URL##*/}
+	msg_ok "${marker}installer should be $PWD/$installer_basename"
+
+	user_name=$(id -un)
+
+	wget -q $HOMEBREW_INSTALLER_URL
+
+	chmod +x $installer_basename
+	msg_ok "chmod +x on $installer_basename"
+
+	msg_ok "${marker}call $EXPECT_SCRIPT to install..."
+	$EXPECT_SCRIPT ./$installer_basename $user_name
+
+	msg_ok "${marker}...done"
+}
+
+set_homebrew_environment() {
+	msg_ok "Create/overwrite $PROFILE_HOMEBREW..."
+	$HOME/.linuxbrew/bin/brew shellenv >$PROFILE_HOMEBREW
+
+	if ! grep -q ". \$HOME/.${PROFILE_HOMEBREW}" $PROFILE_USER
+	then
+		{
+			echo ""
+			echo ". \$HOME/.${PROFILE_HOMEBREW}"
+		} >> $PROFILE_USER
+
+		msg_ok "Added sourcing of $PROFILE_HOMEBREW in $PROFILE_USER..."
+	else
+		msg_ok "Sourcing of $PROFILE_HOMEBREW in $PROFILE_USER already in place"
+	fi
+
+	. $PROFILE_HOMEBREW
+	msg_ok "Activated homebrew environment for further processing"
+}
+
+install_homebrew_packages() {
+	msg_ok "Install Homebrew packages from $HOMEBREW_PACKAGES..."
+
+	for program in $(< $HOMEBREW_PACKAGES) 
+	do
+		msg_ok "-> $program"
+		brew install $program
+	done
+
+	msg_ok "Homebrew package installation finshed"
+}
+
+install_python_packages() {
+	msg_ok "Install Python packages from $HOMEBREW_PACKAGES..."
+
+	for py_package in $(< $PYTHON_PACKAGES) 
+	do
+		msg_ok "-> $py_package"
+		pip3 install $py_package
+	done
+
+	msg_ok "Python packages installation finshed"
+}
+
 
 # ----------------------------------------------------------------------------
 # main
 # ----------------------------------------------------------------------------
 
-msg_warn "Ups..."
-
-msg_ok "Started..."
+main "$@"

@@ -1,0 +1,7 @@
+python3
+node
+nvi
+nvim
+go
+fzf
+ranger
