@@ -5,8 +5,6 @@ use warnings;
 use Fatal qw(open close);
 
 my ($installer_org, $installer_modified);
-my $a = @ARGV;
-print "a: $a\n";
 
 if (@ARGV == 2) {
 	($installer_org, $installer_modified) = @ARGV;
