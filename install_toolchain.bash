@@ -19,7 +19,7 @@ readonly PROG=${0##*/}
 readonly HOMEBREW_BASE_URL=https://raw.githubusercontent.com/Homebrew
 readonly HOMEBREW_INSTALLER_URL=${HOMEBREW_BASE_URL}/install/master/install.sh
 
-readonly EXPECT_SCRIPT=$(cd ${0%/*}; echo $PWD/homebrew_install.expect)
+readonly INST_MODDER=$(cd ${0%/*}; echo $PWD/mod_homebrew_installer.pl)
 
 readonly HOMEBREW_PACKAGES=$(cd ${0%/*}; echo $PWD/packages_homebrew.txt)
 readonly PYTHON_PACKAGES=$(cd ${0%/*}; echo $PWD/packages_python.txt)
@@ -27,6 +27,12 @@ readonly PYTHON_PACKAGES=$(cd ${0%/*}; echo $PWD/packages_python.txt)
 readonly PROFILE_HOMEBREW=$HOME/.profile_homebrew
 readonly PROFILE_USER=$HOME/.profile_local
 
+if [ -n "$WSL_DISTRO_NAME" -a -d /mnt/c/Windows ]
+then
+	readonly IS_WSL_DISTRO=y
+else
+	readonly IS_WSL_DISTRO=n
+fi
 
 readonly TMPDIR=$(mktemp -d)
 trap 'cd - >/dev/null; /bin/rm -rf $TMPDIR' 0 1 2
@@ -39,15 +45,20 @@ cd $TMPDIR
 
 main() {
     check_requirements
-    # initial_cleanup
+    initial_cleanup
 
-    # install_homebrew
+    install_homebrew
 
-    # set_homebrew_environment
-    # install_homebrew_packages
-    # install_python_packages
+    set_homebrew_environment
+    install_homebrew_packages
+    install_python_packages
 
-    install_rust
+	if [ "$IS_WSL_DISTRO" = n ]
+	then
+    	install_rust
+	else
+		msg_warn "WSL detected, skip rust installation"	
+	fi
 
     msg_ok "Done!"
     exit 0
@@ -71,10 +82,10 @@ msg_abort() {
 }
 
 check_requirements() {
-    test -f $EXPECT_SCRIPT || \
-        msg_abort "expect script \"$EXPECT_SCRIPT\" not found"
-    test -x $EXPECT_SCRIPT || \
-        msg_abort "expect script \"$EXPECT_SCRIPT\" found, but not executable"
+    test -f $INST_MODDER || \
+        msg_abort "\"$INSTALLER_MODDER\" not found"
+    test -x $INST_MODDER || \
+        msg_abort "\"$INSTALLER_MODDER\" found, but not executable"
 
     test -f $HOMEBREW_PACKAGES || \
         msg_abort "homebrew packages file \"$HOMEBREW_PACKAGES\" not found"
@@ -92,7 +103,7 @@ initial_cleanup() {
         msg_warn "Detected existing $coc_path..."
         msg_warn "Will save as $coc_path_saved"
 
-        /bin/mv -v $coc_path $coa_path_saved
+        /bin/mv -v $coc_path $coc_path_saved
     fi
 }
 
@@ -113,8 +124,11 @@ install_homebrew() {
     chmod +x $installer_basename
     msg_ok "chmod +x on $installer_basename"
 
-    msg_ok "${marker}call $EXPECT_SCRIPT to install..."
-    $EXPECT_SCRIPT ./$installer_basename $user_name
+	msg_ok "Convince $installer_basename to be behave silently..."
+	$INST_MODDER $installer_basename $installer_basename.mod
+
+	msg_ok "Call (modified) $ ./$installer_basename.mod..."
+	./$installer_basename.mod
 
     msg_ok "${marker}...done"
 }
@@ -127,7 +141,7 @@ set_homebrew_environment() {
     then
         {
             echo ""
-            echo ". \$HOME/.${PROFILE_HOMEBREW}"
+            echo ". ${PROFILE_HOMEBREW/$HOME/\$HOME}"
         } >> $PROFILE_USER
 
         msg_ok "Added sourcing of $PROFILE_HOMEBREW in $PROFILE_USER..."
